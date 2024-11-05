@@ -1,0 +1,17 @@
+subscribers:
+  imu_topic: "/wamv/sensors/imu/imu/data"
+  gps_topic: "/wamv/sensors/gps/gps/fix"
+  reference_position: [-33.7227694, 150.6739842, 1.256729] #for output.bag
+  # reference_position: [-33.72280028614153, 150.6740427241651, 1.2450301479548216] #for circle.bag
+  # reference_position: [-33.72276878149592, 150.67399044470977, 1.2302990267053246] #for straight_path.bag
+
+publishers:
+  # Define publish rate and topics for publishers
+  pose_publish_rate: 1000 # Hz
+  pose_publish_topic: "/wamv/inekf_odom_correction/pose"
+  pose_frame: "/map"
+
+  path_publish_rate: 100 # Hz
+  path_publish_topic: "/wamv/inekf_odom_correction/path"
+
+  enable_slip_publisher: true

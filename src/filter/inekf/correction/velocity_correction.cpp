@@ -49,8 +49,8 @@ VelocityCorrection::VelocityCorrection(
             : std::vector<double>({1, 0, 0, 0});
 
   velocity_scale_ = config_["settings"]["velocity_scale"]
-                   ? config_["settings"]["velocity_scale"].as<double>()
-                   : 1.0;
+                        ? config_["settings"]["velocity_scale"].as<double>()
+                        : 1.0;
 
   // Convert quaternion to rotation matrix for frame transformation
   Eigen::Quaternion<double> quarternion_vel2body(
@@ -99,6 +99,7 @@ bool VelocityCorrection::Correct(RobotState& state) {
 
   if (t_diff < -t_diff_thres_) {
     while (t_diff < -t_diff_thres_) {
+      std::cout << "entered while loop" << std::endl;
       sensor_data_buffer_mutex_ptr_->lock();
       if (sensor_data_buffer_ptr_->empty()) {
         sensor_data_buffer_mutex_ptr_->unlock();
@@ -118,10 +119,11 @@ bool VelocityCorrection::Correct(RobotState& state) {
   H.conservativeResize(3, dimP);
   H.block(0, 0, 3, dimP) = Eigen::MatrixXd::Zero(3, dimP);
   H.block(0, 3, 3, 3) = Eigen::Matrix3d::Identity();
-
+  // std::cout << "H matrix: \n" << H;
   // Fill out N
   N.conservativeResize(3, 3);
-  N = state.get_world_rotation()*covariance_*state.get_world_rotation().transpose();
+  N = state.get_world_rotation() * covariance_
+      * state.get_world_rotation().transpose();
 
   Eigen::Matrix3d R = state.get_rotation();
   Eigen::Vector3d v = state.get_velocity();
@@ -129,7 +131,9 @@ bool VelocityCorrection::Correct(RobotState& state) {
   int startIndex = Z.rows();
   Z.conservativeResize(startIndex + 3, Eigen::NoChange);
   // Rotate the velocity from sensor frame to body frame, then to world frame
-  Z.segment(0, 3) = R * R_vel2body_ * velocity_scale_ * measured_velocity->get_velocity() - v;
+  Z.segment(0, 3)
+      = R * R_vel2body_ * velocity_scale_ * measured_velocity->get_velocity()
+        - v;
 
   // Correct state using stacked observation
   if (Z.rows() > 0) {
