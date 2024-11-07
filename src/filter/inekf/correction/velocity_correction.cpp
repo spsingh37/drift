@@ -113,6 +113,40 @@ bool VelocityCorrection::Correct(RobotState& state) {
     }
   }
 
+  // Open the file in append mode and write the data
+  std::ofstream file("debugging_data.txt", std::ios::app);
+  if (file.is_open()) {
+    // Ensure fixed decimal format with three decimal places for positions
+    file << std::fixed << std::setprecision(6);
+
+    // Get time in seconds with milliseconds precision
+    double filter_time = state.get_propagate_time();
+    double measurement_time = measured_velocity->get_time();
+
+    // Write Filter time
+    file << "Filter time: " << std::fixed << std::setprecision(6) << filter_time
+         << " ";
+
+    // Write Filter state by extracting components explicitly
+    Eigen::Vector3d filter_state = state.get_velocity();
+    file << "Filter state: " << std::fixed << std::setprecision(6)
+         << filter_state.x() << " " << filter_state.y() << " "
+         << filter_state.z() << "; ";
+
+    // Write Measurement time
+    file << "Measurement time: " << std::fixed << std::setprecision(6)
+         << measurement_time << " ";
+
+    // Write Measurement state by extracting components explicitly
+    Eigen::Vector3d measurement_state = measured_velocity->get_velocity();
+    file << "Measurement state: " << std::fixed << std::setprecision(6)
+         << measurement_state.x() << " " << measurement_state.y() << " "
+         << measurement_state.z() << "\n";
+
+    file.close();
+  } else {
+    std::cerr << "Unable to open file for writing imu data.\n";
+  }
   state.set_time(measured_velocity->get_time());
 
   // Fill out H
@@ -125,23 +159,30 @@ bool VelocityCorrection::Correct(RobotState& state) {
   N = state.get_world_rotation() * covariance_
       * state.get_world_rotation().transpose();
 
+  // std::cout << "Measurement noise covariance: \n" << N;
   Eigen::Matrix3d R = state.get_rotation();
   Eigen::Vector3d v = state.get_velocity();
-
+  // std::cout << "Predicted velocity: \n" << state.get_velocity();
+  // std::cout << "Measured velocity (before): "
+  //           << measured_velocity->get_velocity() << "\n";
+  // std::cout << "Measured velocity (after): "
+  //           << R * R_vel2body_ * velocity_scale_
+  //                  * measured_velocity->get_velocity()
+  //           << "\n";
   int startIndex = Z.rows();
   Z.conservativeResize(startIndex + 3, Eigen::NoChange);
   // Rotate the velocity from sensor frame to body frame, then to world frame
   Z.segment(0, 3)
       = R * R_vel2body_ * velocity_scale_ * measured_velocity->get_velocity()
         - v;
-
+  // std::cout << "Z matrix: \n" << Z;
   // Correct state using stacked observation
   if (Z.rows() > 0) {
     CorrectRightInvariant(Z, H, N, state, error_type_);
   }
 
   v = (R * R_vel2body_).inverse() * state.get_velocity();
-
+  // std::cout << "Estimated velocity: \n" << state.get_velocity();
   est_vel_outfile_ << measured_velocity->get_time() << "," << v(0) << ","
                    << v(1) << "," << v(2) << std::endl
                    << std::flush;

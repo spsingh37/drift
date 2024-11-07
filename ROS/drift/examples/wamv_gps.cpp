@@ -49,6 +49,12 @@ int main(int argc, char** argv) {
   YAML::Node config = YAML::LoadFile(ros_config_file);
   std::string imu_topic = config["subscribers"]["imu_topic"].as<std::string>();
   std::string gps_topic = config["subscribers"]["gps_topic"].as<std::string>();
+  std::vector<double> translation_gpssrc2body
+      = config["subscribers"]["translation_gps_source_to_body"]
+            .as<std::vector<double>>();
+  std::vector<double> rotation_gpssrc2body
+      = config["subscribers"]["rotation_gps_source_to_body"]
+            .as<std::vector<double>>();
   // Define the reference position vector: (latitude, longitude, altitude)
   Eigen::Vector3d reference_position;
 
@@ -73,8 +79,9 @@ int main(int argc, char** argv) {
   auto qimu_mutex = qimu_and_mutex.second;
 
   /// TUTORIAL: Add a subscriber for velocity data and get its queue and mutex
-  auto qp_and_mutex
-      = ros_sub.AddGPS2PositionSubscriber(gps_topic, reference_position);
+  auto qp_and_mutex = ros_sub.AddGPS2PositionSubscriber(
+      gps_topic, translation_gpssrc2body, rotation_gpssrc2body,
+      reference_position);
   auto qp = qp_and_mutex.first;
   auto qp_mutex = qp_and_mutex.second;
 

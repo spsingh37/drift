@@ -7,4 +7,4 @@ settings:
   # rotation_odom2body: [0.4794, 0, 0.8776]
 # Position noise parameters:
 noises:
-  position_std: 0.1
+  position_std: 5 #0.1

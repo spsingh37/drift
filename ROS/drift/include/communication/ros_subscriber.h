@@ -218,7 +218,10 @@ class ROSSubscriber {
    * @return GPSNavSatQueuePair navsat queue pair
    */
   PositionQueuePair AddGPS2PositionSubscriber(
-      const std::string& topic_name, const Eigen::Vector3d& reference_position);
+      const std::string& topic_name,
+      const std::vector<double>& translation_gpssrc2body,
+      const std::vector<double>& rotation_gpssrc2body,
+      const Eigen::Vector3d& reference_position);
 
   /**
    * @brief

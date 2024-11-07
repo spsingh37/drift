@@ -28,25 +28,24 @@ def publish_odometry(odom_data):
     """ Publishes odometry data from the file """
     pub = rospy.Publisher('/gt_odom', Odometry, queue_size=10)
     rospy.init_node('odom_publisher_node', anonymous=True)
-    rate = rospy.Rate(60)  # 10 Hz (adjust as needed)
-
-    start_time = time.time()
+    rate = rospy.Rate(60)  # 60 Hz (adjust as needed)
 
     for entry in odom_data:
         if rospy.is_shutdown():
             break
 
+        # Extract timestamp and pose information from odom_data
         timestamp, x, y, z, quat_x, quat_y, quat_z, quat_w = entry
-        
+
         # Convert the UNIX epoch timestamp to ROS Time
         ros_time = rospy.Time.from_sec(timestamp)
-        
+
         # Create Odometry message
         odom_msg = Odometry()
         
         # Header
         odom_msg.header = Header()
-        odom_msg.header.stamp = ros_time  # Use current time for ROS timestamps
+        odom_msg.header.stamp = ros_time  # Use the timestamp from the file
         odom_msg.header.frame_id = "map"  # Frame of reference
 
         # Set position and orientation

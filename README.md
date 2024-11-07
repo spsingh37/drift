@@ -107,7 +107,7 @@ rosrun drift girona500
 ```
 
 **WAMV (Surface vehicle):**
-* With GPS-based position correction [sample bag files here](https://drive.google.com/drive/folders/18y80I0uvZqbu0Zj1m5CrKWFIlmtTFJYp?usp=sharing):
+* With GPS-based position correction:
 ```
 rosrun drift wamv_gps
 ```

@@ -312,6 +312,8 @@ PositionQueuePair ROSSubscriber::AddOdom2PositionSubscriber(
 
 PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
     const std::string& topic_name,
+    const std::vector<double>& translation_gpssrc2body,
+    const std::vector<double>& rotation_gpssrc2body,
     const Eigen::Vector3d& reference_position) {    // Reference lat, lon, alt
   std::cout << "Subscribing to GPS topic: " << topic_name << std::endl;
 
@@ -320,6 +322,16 @@ PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
 
   // Initialize a new mutex for this subscriber
   mutex_list_.emplace_back(new std::mutex);
+
+  // Calculate the transformation from odometry source to body
+  gps_src_to_body_ = Eigen::Matrix4d::Identity();
+  Eigen::Quaternion<double> orientation_quat(
+      rotation_gpssrc2body[0], rotation_gpssrc2body[1], rotation_gpssrc2body[2],
+      rotation_gpssrc2body[3]);
+  gps_src_to_body_.block<3, 3>(0, 0) = orientation_quat.toRotationMatrix();
+  gps_src_to_body_.block<3, 1>(0, 3)
+      = Eigen::Vector3d({translation_gpssrc2body[0], translation_gpssrc2body[1],
+                         translation_gpssrc2body[2]});
 
   // Create the subscriber for GPS data
   subscriber_list_.push_back(nh_->subscribe<sensor_msgs::NavSatFix>(
@@ -803,7 +815,15 @@ void ROSSubscriber::GPS2PositionCallback(
   Eigen::Matrix4d enu_transformation = Eigen::Matrix4d::Identity();
   enu_transformation.block<3, 1>(0, 3) = enu_translation;
 
-  Eigen::Matrix4d transformed_pose = enu_transformation;
+  Eigen::Matrix4d transformed_pose
+      = gps_src_to_body_.inverse() * enu_transformation;
+
+  // Update the position_measurement with the transformed translation and
+  // rotation
+  //   Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0,
+  //   3);
+
+  //   Eigen::Matrix4d transformed_pose = enu_transformation;
   // Update the position_measurement with the transformed translation and
   // rotation
   Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0, 3);
