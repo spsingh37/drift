@@ -28,14 +28,14 @@
 
 #include "drift/filter/base_correction.h"
 #include "drift/filter/base_propagation.h"
-#include "drift/filter/inekf/correction/legged_kinematics_correction.h"
+// #include "drift/filter/inekf/correction/legged_kinematics_correction.h"
 #include "drift/filter/inekf/correction/position_correction.h"
-#include "drift/filter/inekf/correction/velocity_correction.h"
+// #include "drift/filter/inekf/correction/velocity_correction.h"
 #include "drift/filter/inekf/propagation/imu_propagation.h"
 #include "drift/imu_filter/imu_ang_vel_ekf.h"
 #include "drift/measurement/angular_velocity.h"
 #include "drift/measurement/imu.h"
-#include "drift/measurement/legged_kinematics.h"
+// #include "drift/measurement/legged_kinematics.h"
 #include "drift/measurement/navsat.h"
 #include "drift/measurement/odom.h"
 #include "drift/measurement/velocity.h"
@@ -166,12 +166,12 @@ class InekfEstimator {
    * @param[in] yaml_filepath: The yaml file path for the kinematic
    * correction
    */
-  void add_legged_kinematics_correction(
-      LeggedKinQueuePtr buffer_ptr,
-      std::shared_ptr<std::mutex> buffer_mutex_ptr,
-      const std::string& yaml_filepath
-      = "config/filter/inekf/"
-        "correction/mini_cheetah_legged_kinematics_correction.yaml");
+//   void add_legged_kinematics_correction(
+//       LeggedKinQueuePtr buffer_ptr,
+//       std::shared_ptr<std::mutex> buffer_mutex_ptr,
+//       const std::string& yaml_filepath
+//       = "config/filter/inekf/"
+//         "correction/mini_cheetah_legged_kinematics_correction.yaml");
 
   // ======================================================================
   /**
@@ -185,11 +185,11 @@ class InekfEstimator {
    * @param[in] yaml_filepath: The yaml file path for the velocity correction
    * config
    */
-  void add_velocity_correction(VelocityQueuePtr buffer_ptr,
-                               std::shared_ptr<std::mutex> buffer_mutex_ptr,
-                               const std::string& yaml_filepath
-                               = "config/filter/inekf/"
-                                 "correction/velocity_correction.yaml");
+//   void add_velocity_correction(VelocityQueuePtr buffer_ptr,
+//                                std::shared_ptr<std::mutex> buffer_mutex_ptr,
+//                                const std::string& yaml_filepath
+//                                = "config/filter/inekf/"
+//                                  "correction/velocity_correction.yaml");
 
 
   /// @}

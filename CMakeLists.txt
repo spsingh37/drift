@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(drift VERSION 0.1 DESCRIPTION "An InEKF based state estimator")
-
+message(STATUS "PROJECT_SOURCE_DIR: ${PROJECT_SOURCE_DIR}")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3")
 
@@ -36,8 +36,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 # #################################################
 # Create Library                 #
 # #################################################
-# Source file for mini cheetah robot:
-file(GLOB MINI_CHEETAH_KIN_SRC_FILES ${PROJECT_SOURCE_DIR}/src/kinematics/robots/mini_cheetah/*.cpp)
+
 
 set(LIBRARY_TARGET_NAME ${PROJECT_NAME})
 add_library(${LIBRARY_TARGET_NAME}
@@ -47,16 +46,11 @@ add_library(${LIBRARY_TARGET_NAME}
   ${PROJECT_SOURCE_DIR}/src/math/se_k_3.cpp
   ${PROJECT_SOURCE_DIR}/src/filter/base_propagation.cpp
   ${PROJECT_SOURCE_DIR}/src/filter/base_correction.cpp
-  ${PROJECT_SOURCE_DIR}/src/filter/inekf/correction/legged_kinematics_correction.cpp
-  ${PROJECT_SOURCE_DIR}/src/filter/inekf/correction/velocity_correction.cpp
   ${PROJECT_SOURCE_DIR}/src/filter/inekf/correction/position_correction.cpp
   ${PROJECT_SOURCE_DIR}/src/filter/inekf/propagation/imu_propagation.cpp
   ${PROJECT_SOURCE_DIR}/src/filter/inekf/inekf.cpp
   ${PROJECT_SOURCE_DIR}/src/imu_filter/imu_ang_vel_ekf.cpp
   ${PROJECT_SOURCE_DIR}/src/measurement/measurement.cpp
-  ${PROJECT_SOURCE_DIR}/src/measurement/legged_kinematics.cpp
-  ${PROJECT_SOURCE_DIR}/src/kinematics/mini_cheetah_kinematics.cpp
-  ${MINI_CHEETAH_KIN_SRC_FILES}
 )
 target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -76,6 +70,10 @@ target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC
 # #################################################
 if(BUILD_TESTS)
   message("Building tests...")
+  set(INSTALL_GTEST OFF)
+  set(BUILD_GMOCK OFF)
+  set(BUILD_GTEST OFF)
+
   add_subdirectory(tests)
 endif(BUILD_TESTS)
 
@@ -130,10 +128,8 @@ file(GLOB STATE_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/state/*.h)
 
 # Measurements header
 file(GLOB IMU_FILTER_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/imu_filter/*.h)
-file(GLOB KINEMATICS_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/kinematics/*.h)
 file(GLOB MEASUREMENT_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/measurement/*.h)
 file(GLOB MEASUREMENT_IMPL_FILES ${PROJECT_SOURCE_DIR}/include/drift/measurement/impl/*.cpp)
-file(GLOB MINI_CHEETAH_KIN_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/kinematics/robots/mini_cheetah/*.h)
 
 # Utils header
 file(GLOB UTILS_HEADER_FILES ${PROJECT_SOURCE_DIR}/include/drift/utils/*.h)
@@ -158,10 +154,8 @@ install(FILES ${MATH_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIB
 install(FILES ${STATE_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/state)
 
 install(FILES ${IMU_FILTER_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/imu_filter)
-install(FILES ${KINEMATICS_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/kinematics)
 install(FILES ${MEASUREMENT_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/measurement)
 install(FILES ${MEASUREMENT_IMPL_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/measurement/impl)
-install(FILES ${MINI_CHEETAH_KIN_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/kinematics/robots/mini_cheetah)
 
 install(FILES ${UTILS_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/utils)
 

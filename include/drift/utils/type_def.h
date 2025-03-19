@@ -18,10 +18,10 @@
 
 #include "drift/measurement/angular_velocity.h"
 #include "drift/measurement/imu.h"
-#include "drift/measurement/legged_kinematics.h"
+//#include "drift/measurement/legged_kinematics.h"
 #include "drift/measurement/navsat.h"
 #include "drift/measurement/odom.h"
-#include "drift/measurement/velocity.h"
+//#include "drift/measurement/velocity.h"
 #include "drift/state/robot_state.h"
 
 using namespace measurement;
@@ -53,25 +53,20 @@ typedef std::shared_ptr<IMUQueue> IMUQueuePtr; /**< Shared pointer to a
                                                   IMUQueue object. */
 
 // Legged Kinematics:
-typedef std::shared_ptr<LeggedKinematicsMeasurement>
-    LeggedKinMeasurementPtr; /**< Type: Shared pointer to a
-                                 LeggedKinematicsMeasurement object. */
-typedef std::queue<LeggedKinMeasurementPtr>
-    LeggedKinQueue; /**< Type: Queue of LeggedKinMeasurementPtr
-                     * objects.
-                     */
-typedef std::shared_ptr<LeggedKinQueue>
-    LeggedKinQueuePtr; /**< Type: Shared pointer
-                                 to a KinematicsQueue object. */
+//typedef std::shared_ptr<LeggedKinematicsMeasurement>
+//    LeggedKinMeasurementPtr; /**< Type: Shared pointer to a LeggedKinematicsMeasurement object. */
+//typedef std::queue<LeggedKinMeasurementPtr>
+//    LeggedKinQueue; /**< Type: Queue of LeggedKinMeasurementPtr * objects.                      */
+//typedef std::shared_ptr<LeggedKinQueue>
+//    LeggedKinQueuePtr; /**< Type: Shared pointer to a KinematicsQueue object. */
 
 // Velocity:
-typedef std::shared_ptr<VelocityMeasurement<double>>
-    VelocityMeasurementPtr; /**< Type: Shared pointer to a VelocityMeasurement
-                               object. */
-typedef std::queue<VelocityMeasurementPtr>
-    VelocityQueue; /**< Type: Queue of VelocityMeasurementPtr objects. */
-typedef std::shared_ptr<VelocityQueue>
-    VelocityQueuePtr; /**< Type: Shared pointer to a VelocityQueue object. */
+//typedef std::shared_ptr<VelocityMeasurement<double>>
+//    VelocityMeasurementPtr; /**< Type: Shared pointer to a VelocityMeasurement object. */
+//typedef std::queue<VelocityMeasurementPtr>
+//    VelocityQueue; /**< Type: Queue of VelocityMeasurementPtr objects. */
+//typedef std::shared_ptr<VelocityQueue>
+//    VelocityQueuePtr; /**< Type: Shared pointer to a VelocityQueue object. */
 
 // Angular Velocity:
 typedef std::shared_ptr<AngularVelocityMeasurement<double>>

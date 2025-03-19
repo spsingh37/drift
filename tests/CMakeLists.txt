@@ -12,8 +12,4 @@ enable_testing()
 
 add_subdirectory(test_example_1)
 add_subdirectory(imumeasurement_test)
-add_subdirectory(velocitymeasurement_test)
-add_subdirectory(contactmeasurement_test)
-add_subdirectory(jointstatemeasurement_test)
-add_subdirectory(cheetahkinematics_test)
-add_subdirectory(velocitycorrection_test)
+
