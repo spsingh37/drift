@@ -37,7 +37,7 @@ class ROSPublisher {
   ROSPublisher(std::shared_ptr<rclcpp::Node> node,
     RobotStateQueuePtr & robot_state_queue,
     std::shared_ptr<std::mutex> robot_state_queue_mutex,
-    std::string & config_file);
+    const std::string & config_file);
 
   ~ROSPublisher();
 

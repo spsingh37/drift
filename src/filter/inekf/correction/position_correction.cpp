@@ -34,7 +34,7 @@ PositionCorrection::PositionCorrection(
             : 0.3;
 
   std::string est_pose_file
-      = "/home/neofelis/drift_gps/log/vanilla_est_pose_log.txt";
+      = "/home/multy-surya/drift/log/vanilla_est_pose_log.txt";
   est_pose_outfile_.open(est_pose_file);
   est_pose_outfile_.precision(dbl::max_digits10);
 }
@@ -48,7 +48,7 @@ const OdomQueuePtr PositionCorrection::get_sensor_data_buffer_ptr() const {
 bool PositionCorrection::Correct(RobotState& state) {
   Eigen::VectorXd Z;
   Eigen::MatrixXd H, N;
-
+  // std::cout << "Inside Correct..................................: " << std::endl;
   // Lock the sensor data buffer and check for new measurements
   sensor_data_buffer_mutex_ptr_->lock();
   if (sensor_data_buffer_ptr_->empty()) {
@@ -58,7 +58,9 @@ bool PositionCorrection::Correct(RobotState& state) {
 
   OdomMeasurementPtr measured_position = sensor_data_buffer_ptr_->front();
   double t_diff = measured_position->get_time() - state.get_propagate_time();
-
+  std::cout << "t_diff: " << t_diff << std::endl;
+  std::cout << "measured_position->get_time(): " << measured_position->get_time() << std::endl;
+  std::cout << "measured_position: " << measured_position->get_transformation().block<3, 1>(0, 3) << std::endl;
   // Skip measurements that are in the future
   if (t_diff >= 0) {
     sensor_data_buffer_mutex_ptr_->unlock();

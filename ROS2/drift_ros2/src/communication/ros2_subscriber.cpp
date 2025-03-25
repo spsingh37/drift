@@ -5,30 +5,43 @@
 
 namespace ros_wrapper {
 
+// ROSSubscriber::ROSSubscriber(rclcpp::Node::SharedPtr node)
+//     : rclcpp::Node("ros2_subscriber"), node_(node), thread_started_(false) {}
 ROSSubscriber::ROSSubscriber(rclcpp::Node::SharedPtr node)
-    : rclcpp::Node("ros2_subscriber"), node_(node), thread_started_(false) {}
+    : node_(node), thread_started_(false) {}
 
 ROSSubscriber::~ROSSubscriber() {
     if (thread_started_) {
-        subscribing_thread_.join();
+        if (subscribing_thread_.joinable()) {
+            subscribing_thread_.join();
+        }
     }
     subscriber_list_.clear();
     imu_queue_list_.clear();
 }
 
-IMUQueuePair ROSSubscriber::AddIMUSubscriber(const std::string &topic_name) {
-    std::cout << "Subscribing to IMU topic: " << topic_name << std::endl;
-    auto imu_queue_ptr = std::make_shared<IMUQueue>();
-    auto mutex = std::make_shared<std::mutex>();
+IMUQueuePair ROSSubscriber::AddIMUSubscriber(const std::string& topic_name) {
+    RCLCPP_INFO(node_->get_logger(), "Subscribing to IMU topic: %s", topic_name.c_str());
 
-    auto callback = [this, mutex, imu_queue_ptr](const sensor_msgs::msg::Imu::SharedPtr msg) {
-        IMUCallback(msg, mutex, imu_queue_ptr);
+    // Create queue and mutex
+    IMUQueuePtr imu_queue_ptr = std::make_shared<std::queue<std::shared_ptr<ImuMeasurement<double>>>>();
+    auto mutex = std::make_shared<std::mutex>();
+    mutex_list_.push_back(mutex);
+
+    // Create ROS2 subscription
+    auto callback = [this, mutex, imu_queue_ptr](const sensor_msgs::msg::Imu::SharedPtr imu_msg) {
+        this->IMUCallback(imu_msg, mutex, imu_queue_ptr);
     };
 
-    subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::Imu>(
-        topic_name, 10, callback));
+    auto subscriber = node_->create_subscription<sensor_msgs::msg::Imu>(
+        topic_name, 
+        1000,  
+        callback
+    );
 
+    subscriber_list_.push_back(subscriber);
     imu_queue_list_.push_back(imu_queue_ptr);
+
     return {imu_queue_ptr, mutex};
 }
 
@@ -51,7 +64,7 @@ PositionQueuePair ROSSubscriber::AddOdom2PositionSubscriber(
     };
 
     subscriber_list_.push_back(node_->create_subscription<nav_msgs::msg::Odometry>(
-        topic_name, 10, callback));
+        topic_name, 1000, callback));
 
     position_queue_list_.push_back(position_queue_ptr);
     return {position_queue_ptr, mutex};
@@ -77,14 +90,18 @@ PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
     };
 
     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
-        topic_name, 10, callback));
+        topic_name, 1000, callback));
 
     position_queue_list_.push_back(position_queue_ptr);
     return {position_queue_ptr, mutex};
 }
 
+// void ROSSubscriber::StartSubscribingThread() {
+//     subscribing_thread_ = std::thread([this] { rclcpp::spin(node_); });
+//     thread_started_ = true;
+// }
 void ROSSubscriber::StartSubscribingThread() {
-    subscribing_thread_ = std::thread([this] { rclcpp::spin(node_); });
+    subscribing_thread_ = std::thread([this]() { this->RosSpin(); });
     thread_started_ = true;
 }
 
@@ -101,28 +118,76 @@ void ROSSubscriber::StartSubscribingThread() {
 //     const sensor_msgs::msg::Imu::SharedPtr msg,
 //     const std::shared_ptr<std::mutex> &mutex,
 //     IMUQueuePtr &imu_queue) {
+// void ROSSubscriber::IMUCallback(
+//     const sensor_msgs::msg::Imu::SharedPtr imu_msg,
+//     const std::shared_ptr<std::mutex>& mutex, const IMUQueuePtr& imu_queue) {
+//     auto imu_measurement = std::make_shared<ImuMeasurement<double>>();
+//     // imu_measurement->set_header(msg->header.stamp.sec + msg->header.stamp.nanosec / 1e9, msg->header.frame_id);
+//     imu_measurement->set_header(imu_msg->header.stamp.sec, 
+//         imu_msg->header.stamp.sec + imu_msg->header.stamp.nanosec / 1e9, 
+//         imu_msg->header.frame_id);
+//     imu_measurement->set_angular_velocity(imu_msg->angular_velocity.x, imu_msg->angular_velocity.y, imu_msg->angular_velocity.z);
+//     imu_measurement->set_lin_acc(imu_msg->linear_acceleration.x, imu_msg->linear_acceleration.y, imu_msg->linear_acceleration.z);
+
+//     if (Eigen::Vector4d({imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z}).norm() != 0) {
+//         imu_measurement->set_quaternion(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
+//     }
+//     std::cout << "imu x_linear_acccel: " << imu_msg->linear_acceleration.x << std::endl;
+//     std::cout << "imu y_linear_acccel: " << imu_msg->linear_acceleration.y << std::endl;
+//     std::cout << "imu z_linear_acccel: " << imu_msg->linear_acceleration.z << std::endl;
+//     // std::lock_guard<std::mutex> lock(*mutex);
+//     mutex.get()->lock();
+//     imu_queue->push(imu_measurement);
+//     mutex.get()->unlock();
+//     // RCLCPP_INFO(this->get_logger(), "IMU measurement added to queue. Queue size: %lu", imu_queue->size());
+// }
 void ROSSubscriber::IMUCallback(
-    const sensor_msgs::msg::Imu::SharedPtr imu_msg,
-    const std::shared_ptr<std::mutex>& mutex, const IMUQueuePtr& imu_queue) {
+    const sensor_msgs::msg::Imu::SharedPtr imu_msg, 
+    std::shared_ptr<std::mutex> mutex, 
+    IMUQueuePtr imu_queue) {
+
+    // Create an IMU measurement object
     auto imu_measurement = std::make_shared<ImuMeasurement<double>>();
-    // imu_measurement->set_header(msg->header.stamp.sec + msg->header.stamp.nanosec / 1e9, msg->header.frame_id);
-    imu_measurement->set_header(imu_msg->header.stamp.sec, 
+
+    // Set headers and timestamps
+    imu_measurement->set_header(
+        imu_msg->header.stamp.sec, 
         imu_msg->header.stamp.sec + imu_msg->header.stamp.nanosec / 1e9, 
         imu_msg->header.frame_id);
-    imu_measurement->set_angular_velocity(imu_msg->angular_velocity.x, imu_msg->angular_velocity.y, imu_msg->angular_velocity.z);
-    imu_measurement->set_lin_acc(imu_msg->linear_acceleration.x, imu_msg->linear_acceleration.y, imu_msg->linear_acceleration.z);
 
-    if (Eigen::Vector4d({imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z}).norm() != 0) {
-        imu_measurement->set_quaternion(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
+    // Set angular velocity
+    imu_measurement->set_angular_velocity(
+        imu_msg->angular_velocity.x,
+        imu_msg->angular_velocity.y,
+        imu_msg->angular_velocity.z);
+
+    // Set linear acceleration
+    imu_measurement->set_lin_acc(
+        imu_msg->linear_acceleration.x,
+        imu_msg->linear_acceleration.y,
+        imu_msg->linear_acceleration.z);
+
+    // Set quaternion if valid
+    Eigen::Vector4d quat(imu_msg->orientation.w, 
+                         imu_msg->orientation.x, 
+                         imu_msg->orientation.y, 
+                         imu_msg->orientation.z);
+
+    if (quat.norm() != 0) {
+        imu_measurement->set_quaternion(
+            imu_msg->orientation.w, 
+            imu_msg->orientation.x, 
+            imu_msg->orientation.y, 
+            imu_msg->orientation.z);
     }
-    std::cout << "imu x_linear_acccel: " << imu_msg->linear_acceleration.x << std::endl;
-    std::cout << "imu y_linear_acccel: " << imu_msg->linear_acceleration.y << std::endl;
-    std::cout << "imu z_linear_acccel: " << imu_msg->linear_acceleration.z << std::endl;
-    // std::lock_guard<std::mutex> lock(*mutex);
-    mutex.get()->lock();
-    imu_queue->push(imu_measurement);
-    mutex.get()->unlock();
-    RCLCPP_INFO(this->get_logger(), "IMU measurement added to queue. Queue size: %lu", imu_queue->size());
+
+    // Lock and push the measurement into the queue
+    {
+        std::lock_guard<std::mutex> lock(*mutex);
+        imu_queue->push(imu_measurement);
+    }
+
+    // RCLCPP_INFO(node_->get_logger(), "IMU data received and queued.");
 }
 
 // void ROS2Subscriber::Odom2PositionCallback(
@@ -131,32 +196,35 @@ void ROSSubscriber::IMUCallback(
 //     OdomQueuePtr &position_queue) {
 void ROSSubscriber::Odom2PositionCallback(
     const nav_msgs::msg::Odometry::SharedPtr odom_msg,
-    const std::shared_ptr<std::mutex>& position_mutex, const OdomQueuePtr& position_queue) {
+    std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue) {
     auto position_measurement = std::make_shared<OdomMeasurement>();
     Eigen::Vector3d translation(odom_msg->pose.pose.position.x, odom_msg->pose.pose.position.y, odom_msg->pose.pose.position.z);
-    std::cout << "pose x before transform: " << odom_msg->pose.pose.position.x << std::endl;
-    std::cout << "pose y before transform: " << odom_msg->pose.pose.position.y << std::endl;
-    std::cout << "pose z before transform: " << odom_msg->pose.pose.position.z << std::endl;
+    // std::cout << "pose x before transform: " << odom_msg->pose.pose.position.x << std::endl;
+    // std::cout << "pose y before transform: " << odom_msg->pose.pose.position.y << std::endl;
+    // std::cout << "pose z before transform: " << odom_msg->pose.pose.position.z << std::endl;
     Eigen::Matrix4d curr_transformation = Eigen::Matrix4d::Identity();
     curr_transformation.block<3, 1>(0, 3) = translation;
     Eigen::Matrix4d transformed_pose = odom_src_to_body_.inverse() * curr_transformation;
     Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0, 3);
     if (!transformed_translation.allFinite()) {
-        RCLCPP_WARN(this->get_logger(), "Invalid transformation detected!");
+        // RCLCPP_WARN(this->get_logger(), "Invalid transformation detected!");
         return;
     }
-
+    std::cout << "odom_msg time: " << odom_msg->header.stamp.sec + odom_msg->header.stamp.nanosec / 1e9 << std::endl;
     // position_measurement->set_header(msg->header.stamp.sec + msg->header.stamp.nanosec / 1e9, msg->header.frame_id);
     position_measurement->set_header(odom_msg->header.stamp.sec, 
         odom_msg->header.stamp.sec + odom_msg->header.stamp.nanosec / 1e9, 
         odom_msg->header.frame_id);
     position_measurement->set_translation(transformed_translation);
+    position_measurement->set_transformation();
     std::cout << "pose after transform: " << transformed_translation << std::endl;
+    std::cout << "odom_msg time: " << odom_msg->header.stamp.sec + odom_msg->header.stamp.nanosec / 1e9 << std::endl;
     // std::lock_guard<std::mutex> lock(*mutex);
     position_mutex.get()->lock();
+    std::cout << "position_measurement...trans: " << position_measurement->get_transformation()<< std::endl;
     position_queue->push(position_measurement);
     position_mutex.get()->unlock();
-    RCLCPP_INFO(this->get_logger(), "Odom measurement added to queue. Queue size: %lu", position_queue->size());
+    // RCLCPP_INFO(this->get_logger(), "Odom measurement added to queue. Queue size: %lu", position_queue->size());
 }
 
 // void ROS2Subscriber::GPS2PositionCallback(
@@ -176,11 +244,12 @@ void ROSSubscriber::Odom2PositionCallback(
 // }
 void ROSSubscriber::GPS2PositionCallback(
     const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
-    const std::shared_ptr<std::mutex>& position_mutex,
-    const OdomQueuePtr& position_queue, 
+    std::shared_ptr<std::mutex> position_mutex,
+    OdomQueuePtr position_queue, 
     const Eigen::Vector3d& reference_position) {
 
-    std::shared_ptr<OdomMeasurement> position_measurement = std::make_shared<OdomMeasurement>();
+    // std::shared_ptr<OdomMeasurement> position_measurement = std::make_shared<OdomMeasurement>();
+    auto position_measurement = std::make_shared<OdomMeasurement>();
 
     double lat0 = reference_position(0);
     double lon0 = reference_position(1);
@@ -205,7 +274,7 @@ void ROSSubscriber::GPS2PositionCallback(
     // Set headers and timestamps using ROS2 format
     position_measurement->set_header(
         gps_msg->header.stamp.sec,  // Sequence number (ROS2 does not use `seq`)
-        rclcpp::Time(gps_msg->header.stamp).seconds(),  // Convert to double timestamp
+        gps_msg->header.stamp.sec + gps_msg->header.stamp.nanosec / 1e9,
         gps_msg->header.frame_id);
 
     position_measurement->set_translation(transformed_translation);
@@ -218,6 +287,11 @@ void ROSSubscriber::GPS2PositionCallback(
     position_mutex.get()->unlock();
 }
 
+void ROSSubscriber::RosSpin() {
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node_);
+    executor.spin();
+}
 // void RosSpin() {
 //     rclcpp::executors::MultiThreadedExecutor executor;
 //     executor.add_node(shared_from_this());  // Add the node to the executor

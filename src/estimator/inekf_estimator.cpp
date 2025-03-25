@@ -98,10 +98,13 @@ InekfEstimator::~InekfEstimator() {
 void InekfEstimator::RunOnce() {
   // Propagate
   new_pose_ready_ = propagation_.get()->Propagate(state_);
-
+  // std::cout << "inekf_estimator RunOnce......................................................................: " << std::endl;
   // Correct
   for (auto& correction : corrections_) {
+    std::cout << "Inside auto& correction......................................................................: " << std::endl;
+    // std::cout << "correction.get(): " << correction.get() << std::endl;
     if (correction.get()->Correct(state_)) {
+      std::cout << "Correction done......................................................................: " << std::endl;
       new_pose_ready_ = true;
     }
   }

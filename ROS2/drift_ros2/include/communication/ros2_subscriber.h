@@ -46,7 +46,7 @@ typedef std::pair<GPSNavSatQueuePtr, std::shared_ptr<std::mutex>> GPSNavSatQueue
 
 namespace ros_wrapper {
 
-class ROSSubscriber : public rclcpp::Node {
+class ROSSubscriber {
 public:
     ROSSubscriber(rclcpp::Node::SharedPtr node);
     ~ROSSubscriber();
@@ -66,16 +66,21 @@ private:
     // void IMUCallback(const sensor_msgs::msg::Imu::SharedPtr imu_msg,
     //                   const std::shared_ptr<std::mutex>& mutex,
     //                   IMUQueuePtr& imu_queue);
+    // void IMUCallback(
+    //     const sensor_msgs::msg::Imu::SharedPtr imu_msg,
+    //     const std::shared_ptr<std::mutex>& mutex, const IMUQueuePtr& imu_queue);
+    
     void IMUCallback(
-        const sensor_msgs::msg::Imu::SharedPtr imu_msg,
-        const std::shared_ptr<std::mutex>& mutex, const IMUQueuePtr& imu_queue);
+            const sensor_msgs::msg::Imu::SharedPtr imu_msg, 
+            std::shared_ptr<std::mutex> mutex, 
+            IMUQueuePtr imu_queue);
 
     // void Odom2PositionCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg,
     //                             const std::shared_ptr<std::mutex>& position_mutex,
     //                             OdomQueuePtr& position_queue);
     void Odom2PositionCallback(
         const nav_msgs::msg::Odometry::SharedPtr odom_msg,
-        const std::shared_ptr<std::mutex>& position_mutex, const OdomQueuePtr& position_queue);
+        std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue);
 
     // void GPS2PositionCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
     //                            const std::shared_ptr<std::mutex>& position_mutex,
@@ -83,7 +88,7 @@ private:
     //                            const Eigen::Vector3d& reference_position);
     void GPS2PositionCallback(
         const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
-        const std::shared_ptr<std::mutex>& position_mutex, const OdomQueuePtr& position_queue, const Eigen::Vector3d& reference_position);
+        std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue, const Eigen::Vector3d& reference_position);
 
     void RosSpin();
     std::shared_ptr<rclcpp::Node> node_;
