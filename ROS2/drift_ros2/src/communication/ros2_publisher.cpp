@@ -84,6 +84,9 @@ YAML::Node config = YAML::LoadFile(config_file);
 
 std::string pose_topic = config["publishers"]["pose_publish_topic"].as<std::string>();
 std::string path_topic = config["publishers"]["path_publish_topic"].as<std::string>();
+std::string twist_topic = config["publishers"]["twist_publish_topic"].as<std::string>();
+// std::string odom_topic = config["publishers"]["odom_publish_topic"].as<std::string>();
+
 pose_frame_ = config["publishers"]["pose_frame"].as<std::string>();
 
 pose_publish_rate_ = config["publishers"]["pose_publish_rate"].as<double>();
@@ -100,6 +103,10 @@ pose_topic.c_str(), path_topic.c_str());
 
 pose_pub_ = node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(pose_topic, 1000);
 path_pub_ = node_->create_publisher<nav_msgs::msg::Path>(path_topic, 1000);
+twist_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(twist_topic, 1000);
+// odom_pub_ = node_->create_publisher<nav_msgs::msg::Odometry>(odom_topic, 1000);
+
+prev_state_ = nullptr;
 }
 
 // ROSPublisher::~ROSPublisher() {
@@ -293,6 +300,9 @@ void ROSPublisher::PosePublish() {
   pose_pub_->publish(pose_msg);
 
   pose_seq_++;
+  TwistPublish(state);
+  // OdometryPublish(pose_msg, state); 
+
 
   int pose_skip = pose_publish_rate_ / path_publish_rate_;
   // std::cout << "pose_skip: " << pose_skip << std::endl;
@@ -306,6 +316,79 @@ void ROSPublisher::PosePublish() {
       poses_.push_back(pose_stamped);
   }
 }
+
+void ROSPublisher::TwistPublish(const RobotState& state) {
+  geometry_msgs::msg::TwistStamped twist_msg;
+  twist_msg.header.stamp = rclcpp::Time(static_cast<uint64_t>(state.get_time() * 1e9));
+  twist_msg.header.frame_id = pose_frame_;  // Same as pose frame
+
+  // Linear velocity
+  Eigen::Vector3d lin_vel = state.get_world_velocity();  // This is the linear velocity
+
+  twist_msg.twist.linear.x = lin_vel.x();
+  twist_msg.twist.linear.y = lin_vel.y();
+  twist_msg.twist.linear.z = lin_vel.z();
+
+  // Angular velocity estimation (from rotation difference)
+  // if (prev_state_) {
+  //     double dt = state.get_time() - prev_state_->get_time();
+  //     if (dt > 1e-6) {
+  //         Eigen::Quaterniond q1(prev_state_->get_world_rotation());
+  //         Eigen::Quaterniond q2(state.get_world_rotation());
+
+  //         Eigen::Quaterniond dq = q2 * q1.inverse();
+  //         Eigen::AngleAxisd angle_axis(dq);
+
+  //         Eigen::Vector3d ang_vel = angle_axis.axis() * angle_axis.angle() / dt;
+
+  //         twist_msg.twist.angular.x = ang_vel.x();
+  //         twist_msg.twist.angular.y = ang_vel.y();
+  //         twist_msg.twist.angular.z = ang_vel.z();
+  //     }
+  // }
+
+  twist_pub_->publish(twist_msg);
+
+  // Save current state for next angular velocity computation
+  prev_state_ = std::make_shared<RobotState>(state);
+}
+
+// void ROSPublisher::OdometryPublish(const geometry_msgs::msg::PoseWithCovarianceStamped& pose_msg, const RobotState& state) {
+//   nav_msgs::msg::Odometry odom_msg;
+
+//   // Copy header and pose from existing pose_msg
+//   odom_msg.header = pose_msg.header;
+//   odom_msg.pose = pose_msg.pose;
+//   odom_msg.child_frame_id = pose_frame_;  // Typically "base_link"
+
+//   // Linear velocity
+//   Eigen::Vector3d lin_vel = state.get_world_velocity();
+//   odom_msg.twist.twist.linear.x = lin_vel.x();
+//   odom_msg.twist.twist.linear.y = lin_vel.y();
+//   odom_msg.twist.twist.linear.z = lin_vel.z();
+
+//   // Angular velocity estimation
+//   if (prev_state_) {
+//       double dt = state.get_time() - prev_state_->get_time();
+//       if (dt > 1e-6) {
+//           Eigen::Quaterniond q1(prev_state_->get_world_rotation());
+//           Eigen::Quaterniond q2(state.get_world_rotation());
+
+//           Eigen::Quaterniond dq = q2 * q1.inverse();
+//           Eigen::AngleAxisd angle_axis(dq);
+//           Eigen::Vector3d ang_vel = angle_axis.axis() * angle_axis.angle() / dt;
+
+//           odom_msg.twist.twist.angular.x = ang_vel.x();
+//           odom_msg.twist.twist.angular.y = ang_vel.y();
+//           odom_msg.twist.twist.angular.z = ang_vel.z();
+//       }
+//   }
+
+//   odom_pub_->publish(odom_msg);
+//   prev_state_ = std::make_shared<RobotState>(state);
+// }
+
+
 
 // Pose publishing thread
 // void ROSPublisher::PosePublishingThread() {

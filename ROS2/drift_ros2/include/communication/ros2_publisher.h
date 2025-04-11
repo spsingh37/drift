@@ -9,8 +9,11 @@
 #include <thread>
 
 #include <nav_msgs/msg/path.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
+
 #include <geometry_msgs/msg/vector3_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <yaml-cpp/yaml.h>
@@ -52,6 +55,8 @@ class ROSPublisher {
 
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
+  // rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
 
   rclcpp::TimerBase::SharedPtr pose_timer_;
   rclcpp::TimerBase::SharedPtr path_timer_;
@@ -73,11 +78,19 @@ class ROSPublisher {
 
   bool enable_slip_publisher_;
 
+  std::shared_ptr<RobotState> prev_state_;
+
+
   void PathPublishingThread();
   void PathPublish();
 
   void PosePublishingThread();
   void PosePublish();
+
+  void TwistPublish(const RobotState& state);
+  // void OdometryPublish(const geometry_msgs::msg::PoseWithCovarianceStamped& pose_msg,
+  //   const RobotState& state);
+
 
   void SlipPublish();
   void SlipFlagPublish();

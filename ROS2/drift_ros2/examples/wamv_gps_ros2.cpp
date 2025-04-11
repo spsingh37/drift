@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 
     // Main loop with continuous spinning
     std::thread estimator_thread([&]() {
-        rclcpp::Rate rate(500);  // 20 Hz
+        rclcpp::Rate rate(50000);  // 20 Hz
         while (rclcpp::ok()) {
             if (inekf_estimator.is_enabled()) {
                 inekf_estimator.RunOnce();
