@@ -54,8 +54,7 @@ public:
     IMUQueuePair AddIMUSubscriber(const std::string& topic_name);
     PositionQueuePair AddGPS2PositionSubscriber(const std::string& topic_name,
                                                 const std::vector<double>& translation_gpssrc2body,
-                                                const std::vector<double>& rotation_gpssrc2body,
-                                                const Eigen::Vector3d& reference_position);
+                                                const std::vector<double>& rotation_gpssrc2body);
     PositionQueuePair AddOdom2PositionSubscriber(const std::string& topic_name,
                                                  const std::vector<double>& translation_odomsrc2body,
                                                  const std::vector<double>& rotation_odomsrc2body);
@@ -86,9 +85,13 @@ private:
     //                            const std::shared_ptr<std::mutex>& position_mutex,
     //                            OdomQueuePtr& position_queue,
     //                            const Eigen::Vector3d& reference_position);
+    // void GPS2PositionCallback(
+    //     const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
+    //     std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue, const Eigen::Vector3d& reference_position);
     void GPS2PositionCallback(
         const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
-        std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue, const Eigen::Vector3d& reference_position);
+        std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue, 
+        Eigen::Vector3d& reference_position);
 
     void RosSpin();
     std::shared_ptr<rclcpp::Node> node_;
@@ -108,6 +111,11 @@ private:
 
     bool thread_started_;
     std::thread subscribing_thread_;
+
+    // Globals
+    Eigen::Vector3d reference_position;
+    bool reference_initialized = false;
+
 
     rclcpp::executors::MultiThreadedExecutor executor;
 

@@ -222,9 +222,18 @@ bool ImuPropagation::Propagate(RobotState& state) {
     }
   }
 
+  if (!init_imu_orient_set) {
+    init_rot = imu_measurement->get_quaternion().toRotationMatrix();
+    init_imu_orient_set = true;
+    std::cout << "initial imu rotation set" << std::endl;
+  }
+
+  // Eigen::Matrix3d current_rot = imu_measurement->get_quaternion().toRotationMatrix();
+  Eigen::Matrix3d relative_rot = init_rot.transpose() * imu_measurement->get_quaternion().toRotationMatrix();
   //  ------------ Update State --------------- //
   state.set_X(X_pred);
   state.set_P(P_pred);
+  state.set_rotation(relative_rot);
 
   return true;
 }

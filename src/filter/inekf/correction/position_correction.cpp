@@ -58,9 +58,9 @@ bool PositionCorrection::Correct(RobotState& state) {
 
   OdomMeasurementPtr measured_position = sensor_data_buffer_ptr_->front();
   double t_diff = measured_position->get_time() - state.get_propagate_time();
-  std::cout << "t_diff: " << t_diff << std::endl;
-  std::cout << "measured_position->get_time(): " << measured_position->get_time() << std::endl;
-  std::cout << "measured_position: " << measured_position->get_transformation().block<3, 1>(0, 3) << std::endl;
+  // std::cout << "t_diff: " << t_diff << std::endl;
+  // std::cout << "measured_position->get_time(): " << measured_position->get_time() << std::endl;
+  // std::cout << "measured_position: " << measured_position->get_transformation().block<3, 1>(0, 3) << std::endl;
   // Skip measurements that are in the future
   if (t_diff >= 0) {
     sensor_data_buffer_mutex_ptr_->unlock();

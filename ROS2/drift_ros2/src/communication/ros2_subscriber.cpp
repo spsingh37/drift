@@ -70,31 +70,137 @@ PositionQueuePair ROSSubscriber::AddOdom2PositionSubscriber(
     return {position_queue_ptr, mutex};
 }
 
+// PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
+//     const std::string &topic_name,
+//     const std::vector<double> &translation_gpssrc2body,
+//     const std::vector<double> &rotation_gpssrc2body,
+//     const Eigen::Vector3d &reference_position) {
+//     std::cout << "Subscribing to GPS topic: " << topic_name << std::endl;
+//     auto position_queue_ptr = std::make_shared<OdomQueue>();
+//     auto mutex = std::make_shared<std::mutex>();
+
+//     Eigen::Quaternion<double> orientation_quat(rotation_gpssrc2body[0], rotation_gpssrc2body[1],
+//                                                rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+//     gps_src_to_body_ = Eigen::Matrix4d::Identity();
+//     gps_src_to_body_.block<3, 3>(0, 0) = orientation_quat.toRotationMatrix();
+//     gps_src_to_body_.block<3, 1>(0, 3) = Eigen::Vector3d(translation_gpssrc2body.data());
+
+//     auto callback = [this, mutex, position_queue_ptr, reference_position](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+//         GPS2PositionCallback(msg, mutex, position_queue_ptr, reference_position);
+//     };
+
+//     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+//         topic_name, 1000, callback));
+
+//     position_queue_list_.push_back(position_queue_ptr);
+//     return {position_queue_ptr, mutex};
+// }
+
+// PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
+//     const std::string &topic_name,
+//     const std::vector<double> &translation_gpssrc2body,
+//     const std::vector<double> &rotation_gpssrc2body) 
+// {
+//     std::cout << "Subscribing to GPS topic: " << topic_name << std::endl;
+    
+//     auto position_queue_ptr = std::make_shared<OdomQueue>();
+//     auto mutex = std::make_shared<std::mutex>();
+
+//     Eigen::Quaternion<double> orientation_quat(
+//         rotation_gpssrc2body[0], rotation_gpssrc2body[1],
+//         rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+
+//     gps_src_to_body_ = Eigen::Matrix4d::Identity();
+//     gps_src_to_body_.block<3, 3>(0, 0) = orientation_quat.toRotationMatrix();
+//     gps_src_to_body_.block<3, 1>(0, 3) = Eigen::Vector3d(translation_gpssrc2body.data());
+
+//     // Lambda callback without passing reference_position_ptr anymore
+//     auto callback = [this, mutex, position_queue_ptr](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+//         std::lock_guard<std::mutex> lock(*mutex);
+
+//         if (!reference_initialized) {
+//             reference_position << msg->latitude, msg->longitude, msg->altitude;
+//             reference_initialized = true;
+//             RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
+//                         reference_position(0), reference_position(1), reference_position(2));
+//         }
+
+//         GPS2PositionCallback(msg, mutex, position_queue_ptr);
+//     };
+
+//     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+//         topic_name, 1000, callback));
+
+//     position_queue_list_.push_back(position_queue_ptr);
+//     return {position_queue_ptr, mutex};
+// }
+
 PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
     const std::string &topic_name,
     const std::vector<double> &translation_gpssrc2body,
-    const std::vector<double> &rotation_gpssrc2body,
-    const Eigen::Vector3d &reference_position) {
+    const std::vector<double> &rotation_gpssrc2body) 
+{
     std::cout << "Subscribing to GPS topic: " << topic_name << std::endl;
+    
     auto position_queue_ptr = std::make_shared<OdomQueue>();
     auto mutex = std::make_shared<std::mutex>();
 
-    Eigen::Quaternion<double> orientation_quat(rotation_gpssrc2body[0], rotation_gpssrc2body[1],
-                                               rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+    // Set gps_src_to_body_ transform
+    Eigen::Quaternion<double> orientation_quat(
+        rotation_gpssrc2body[0], rotation_gpssrc2body[1],
+        rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+
     gps_src_to_body_ = Eigen::Matrix4d::Identity();
     gps_src_to_body_.block<3, 3>(0, 0) = orientation_quat.toRotationMatrix();
     gps_src_to_body_.block<3, 1>(0, 3) = Eigen::Vector3d(translation_gpssrc2body.data());
 
-    auto callback = [this, mutex, position_queue_ptr, reference_position](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-        GPS2PositionCallback(msg, mutex, position_queue_ptr, reference_position);
+    // Create a temporary subscription JUST to initialize reference_position
+    rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr temp_sub;
+    temp_sub = node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+        topic_name, 10,
+        [&, this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+            if (!reference_initialized) {
+                reference_position << msg->latitude, msg->longitude, msg->altitude;
+                reference_initialized = true;
+                RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
+                            reference_position(0), reference_position(1), reference_position(2));
+                
+                // After initializing, destroy this temp subscriber
+                temp_sub.reset();
+            }
+        });
+
+    // Real subscriber (pure callback assuming reference_position is ready)
+    auto callback = [this, mutex, position_queue_ptr](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+        if (!reference_initialized) {
+            reference_position << msg->latitude, msg->longitude, msg->altitude;
+            reference_initialized = true;
+            RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
+                        reference_position(0), reference_position(1), reference_position(2));
+        }
+    
+        // RCLCPP_INFO(node_->get_logger(), "Processing GPS message: [%f, %f, %f]", msg->latitude, msg->longitude, msg->altitude);
+        
+        // Check if the reference position is initialized
+        if (reference_initialized) {
+            GPS2PositionCallback(msg, mutex, position_queue_ptr, reference_position);
+        } else {
+            RCLCPP_WARN(node_->get_logger(), "Reference position still not initialized! Skipping message.");
+        }
     };
+    // auto callback = [this, mutex, position_queue_ptr, reference_position](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+    //             GPS2PositionCallback(msg, mutex, position_queue_ptr, reference_position);
+    //         };
 
     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
         topic_name, 1000, callback));
 
     position_queue_list_.push_back(position_queue_ptr);
+
     return {position_queue_ptr, mutex};
 }
+
+
 
 // void ROSSubscriber::StartSubscribingThread() {
 //     subscribing_thread_ = std::thread([this] { rclcpp::spin(node_); });
@@ -242,50 +348,101 @@ void ROSSubscriber::Odom2PositionCallback(
 //     std::lock_guard<std::mutex> lock(*mutex);
 //     position_queue->push(position_measurement);
 // }
+// void ROSSubscriber::GPS2PositionCallback(
+//     const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
+//     std::shared_ptr<std::mutex> position_mutex,
+//     OdomQueuePtr position_queue, 
+//     const Eigen::Vector3d& reference_position) {
+
+//     // std::shared_ptr<OdomMeasurement> position_measurement = std::make_shared<OdomMeasurement>();
+//     auto position_measurement = std::make_shared<OdomMeasurement>();
+
+//     double lat0 = reference_position(0);
+//     double lon0 = reference_position(1);
+//     double alt0 = reference_position(2);
+
+//     // Convert GPS coordinates to ENU coordinates
+//     measurement::NavSatMeasurement<double> navsat_measurement;
+//     navsat_measurement.set_navsatfix(gps_msg->latitude, gps_msg->longitude, gps_msg->altitude);
+
+//     // Obtain ENU coordinates relative to the reference lat/lon/alt
+//     Eigen::Matrix<double, 3, 1> enu_translation = navsat_measurement.get_enu(lat0, lon0, alt0);
+
+//     // Set up transformation matrix for ENU translation (no rotation as GPS lacks orientation data)
+//     Eigen::Matrix4d enu_transformation = Eigen::Matrix4d::Identity();
+//     enu_transformation.block<3, 1>(0, 3) = enu_translation;
+
+//     Eigen::Matrix4d transformed_pose = gps_src_to_body_.inverse() * enu_transformation;
+
+//     // Extract transformed translation
+//     Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0, 3);
+
+//     // Set headers and timestamps using ROS2 format
+//     position_measurement->set_header(
+//         gps_msg->header.stamp.sec,  // Sequence number (ROS2 does not use `seq`)
+//         gps_msg->header.stamp.sec + gps_msg->header.stamp.nanosec / 1e9,
+//         gps_msg->header.frame_id);
+
+//     position_measurement->set_translation(transformed_translation);
+//     position_measurement->set_transformation();
+
+//     // Use lock_guard for RAII-based thread safety
+//     // std::lock_guard<std::mutex> lock(*mutex);
+//     position_mutex.get()->lock();
+//     position_queue->push(position_measurement);
+//     position_mutex.get()->unlock();
+// }
+
 void ROSSubscriber::GPS2PositionCallback(
     const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
     std::shared_ptr<std::mutex> position_mutex,
-    OdomQueuePtr position_queue, 
-    const Eigen::Vector3d& reference_position) {
+    OdomQueuePtr position_queue,
+    Eigen::Vector3d& reference_position)
+{
+    // If somehow called before reference initialized, skip safely
+    if (!reference_initialized) {
+        RCLCPP_WARN(node_->get_logger(), "Reference position not initialized yet! Ignoring GPS message.");
+        return;
+    }
 
-    // std::shared_ptr<OdomMeasurement> position_measurement = std::make_shared<OdomMeasurement>();
     auto position_measurement = std::make_shared<OdomMeasurement>();
 
     double lat0 = reference_position(0);
     double lon0 = reference_position(1);
     double alt0 = reference_position(2);
 
-    // Convert GPS coordinates to ENU coordinates
+    // Convert GPS to ENU
     measurement::NavSatMeasurement<double> navsat_measurement;
     navsat_measurement.set_navsatfix(gps_msg->latitude, gps_msg->longitude, gps_msg->altitude);
 
-    // Obtain ENU coordinates relative to the reference lat/lon/alt
     Eigen::Matrix<double, 3, 1> enu_translation = navsat_measurement.get_enu(lat0, lon0, alt0);
 
-    // Set up transformation matrix for ENU translation (no rotation as GPS lacks orientation data)
+    // Build ENU transformation (translation only, no rotation)
     Eigen::Matrix4d enu_transformation = Eigen::Matrix4d::Identity();
     enu_transformation.block<3, 1>(0, 3) = enu_translation;
 
+    // Apply body-frame correction
     Eigen::Matrix4d transformed_pose = gps_src_to_body_.inverse() * enu_transformation;
-
-    // Extract transformed translation
     Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0, 3);
 
-    // Set headers and timestamps using ROS2 format
+    // Fill position measurement
     position_measurement->set_header(
-        gps_msg->header.stamp.sec,  // Sequence number (ROS2 does not use `seq`)
+        gps_msg->header.stamp.sec,
         gps_msg->header.stamp.sec + gps_msg->header.stamp.nanosec / 1e9,
         gps_msg->header.frame_id);
 
     position_measurement->set_translation(transformed_translation);
     position_measurement->set_transformation();
 
-    // Use lock_guard for RAII-based thread safety
-    // std::lock_guard<std::mutex> lock(*mutex);
-    position_mutex.get()->lock();
-    position_queue->push(position_measurement);
-    position_mutex.get()->unlock();
+    // Push into queue with thread safety
+    {
+        std::lock_guard<std::mutex> lock(*position_mutex);
+        position_queue->push(position_measurement);
+    }
 }
+
+
+
 
 void ROSSubscriber::RosSpin() {
     rclcpp::executors::MultiThreadedExecutor executor;

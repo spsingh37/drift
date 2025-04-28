@@ -232,6 +232,10 @@ class ImuPropagation : public Propagation {
       bias_init_vec_; /**< The initialized IMU bias value in the order of
                        [gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z]. */
 
+  bool init_imu_orient_set = false;
+  Eigen::Matrix3d init_rot;
+  Eigen::Matrix3d relative_rot;
+
 };                    // End of class ImuPropagation
 }    // namespace filter::inekf
 

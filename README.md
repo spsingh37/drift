@@ -27,15 +27,14 @@ Required by header files. Download and install instructions can be found at: htt
 > ### Yaml-cpp
 Required by header files. Download and install instructions can be found at: https://github.com/jbeder/yaml-cpp.
 
-> ### ROS2 (Optional)
-Building with ROS2 is optional. Instructions are [found below](https://github.com/UMich-CURLY/drift/tree/main#4-ros).
+> ### ROS1 (Optional)
+Building with ROS1 is optional. Instructions are [found below](https://github.com/UMich-CURLY/drift/tree/main#4-ros).
 
 # Building DRIFT library
 
 Clone the repository:
 ```
-git clone -b ros2 https://github.com/spsingh37/drift.git
-cd drift
+git clone https://github.com/UMich-CURLY/drift.git
 ```
 Create another directory which we will name 'build' and use cmake and make to compile an build project:
 
@@ -52,42 +51,65 @@ After building the library, you can install the library to the system. This will
 ```
 sudo make install
 ```
-Then, you can include the library in your project by adding the following line to your CMakeLists.txt file (this is already done in this repo so ignore):
+Then, you can include the library in your project by adding the following line to your CMakeLists.txt file:
 ```
 find_package(drift REQUIRED)
 ```
 
-# ROS2
+# ROS
 ## Examples
-We provide some examples in the `ROS2/drift_ros2/examples` directory. 
+We provide several examples in the `ROS/examples` directory. 
 
-## Building the ROS2 node
-1. Build the custom_sensor_msgs:
+## Building the ROS1 node
+1. Add `/ROS/drift` to the `ROS_PACKAGE_PATH` environment variable. Open your ~/.bashrc file in a text editor and add the following line to the end. Replace PATH/TO with the directory path to where you cloned drift:
 
   ```
-  cd <PATH>/<TO>/drift/ROS2/drift_ros2/src/custom_sensor_msgs
-  colcon build --packages-select custom_sensor_msgs
-  source install/setup.bash
+  export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:PATH/TO/drift/ROS/drift
+  ```
+
+  Then
+  ```
+  source ~/.bashrc
   ```
   
-2. Build the ROS2 wrapper
+2. Execute `build_ros.sh` script in the repository root directory:
+
   ```
-  cd ../..
-  colcon build --symlink-install
-  source install/setup.bash
+  cd <PATH>/<TO>/drift
+  chmod +x build_ros.sh
+  ./build_ros.sh
   ```
 
 ## Run examples
-**WAMV (Surface vehicle):**
-With Ground-truth-based position correction:
+**Clearpath Husky robot:**
 ```
-ros2 run drift_ros2 wamv_gtodom_ros2
+rosrun drift husky
+```
+
+**Fetch robot with the gyro filter:**
+```
+rosrun drift fetch
+```
+
+**Full-size vehicle:**
+```
+rosrun drift neya
+```
+
+**MIT mini-cheetah robot:**
+```
+rosrun drift mini_cheetah
+```
+
+**Girona500 (Marine robot):**
+```
+rosrun drift girona500
 ```
 
 **WAMV (Surface vehicle):**
-With GPS-based position correction:
+* With GPS-based position correction:
 ```
-ros2 run drift_ros2 wamv_gps_ros2
+rosrun drift wamv_gps
 ```
 
 ## Run the repo with your own robots:
