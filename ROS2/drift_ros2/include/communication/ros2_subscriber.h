@@ -32,6 +32,7 @@ using namespace measurement;
 typedef std::pair<IMUQueuePtr, std::shared_ptr<std::mutex>> IMUQueuePair;
 typedef std::pair<OdomQueuePtr, std::shared_ptr<std::mutex>> PositionQueuePair;
 typedef std::pair<OdomQueuePtr, std::shared_ptr<std::mutex>> OdomQueuePair;
+typedef std::pair<OdomQueuePtr, std::shared_ptr<std::mutex>> PoseQueuePair;
 
 typedef message_filters::Subscriber<sensor_msgs::msg::Imu> IMUMsgFilterT;
 typedef message_filters::Subscriber<geometry_msgs::msg::Vector3Stamped> IMUOffsetMsgFilterT;
@@ -55,6 +56,10 @@ public:
     PositionQueuePair AddGPS2PositionSubscriber(const std::string& topic_name,
                                                 const std::vector<double>& translation_gpssrc2body,
                                                 const std::vector<double>& rotation_gpssrc2body);
+    PoseQueuePair AddGPSIMU2PoseSubscriber(const std::string& gps_topic_name,
+                                           const std::string& imu_topic_name,
+                                           const std::vector<double>& translation_gpssrc2body,
+                                           const std::vector<double>& rotation_gpssrc2body);
     PositionQueuePair AddOdom2PositionSubscriber(const std::string& topic_name,
                                                  const std::vector<double>& translation_odomsrc2body,
                                                  const std::vector<double>& rotation_odomsrc2body);
@@ -92,6 +97,11 @@ private:
         const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
         std::shared_ptr<std::mutex> position_mutex, OdomQueuePtr position_queue, 
         Eigen::Vector3d& reference_position);
+    
+    void GPSIMU2PoseCallback(
+        const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
+        std::shared_ptr<std::mutex> mutex, const Eigen::Quaterniond& latest_orientation, OdomQueuePtr pose_queue_ptr,
+        Eigen::Vector3d& reference_position);
 
     void RosSpin();
     std::shared_ptr<rclcpp::Node> node_;
@@ -102,6 +112,8 @@ private:
   
     std::vector<OdomQueuePtr>
       position_queue_list_;    // List of pose queue pointers
+
+    std::vector<OdomQueuePtr> pose_queue_list_;
 
     std::vector<IMUSyncPtr> imu_sync_list_;
     std::vector<std::shared_ptr<std::mutex>> mutex_list_;
@@ -115,6 +127,10 @@ private:
     // Globals
     Eigen::Vector3d reference_position;
     bool reference_initialized = false;
+
+    std::shared_ptr<Eigen::Quaterniond> initial_orientation = std::make_shared<Eigen::Quaterniond>();
+    bool initial_orientation_set = false;
+
 
 
     rclcpp::executors::MultiThreadedExecutor executor;

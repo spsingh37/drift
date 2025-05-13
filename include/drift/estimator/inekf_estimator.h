@@ -30,6 +30,7 @@
 #include "drift/filter/base_propagation.h"
 // #include "drift/filter/inekf/correction/legged_kinematics_correction.h"
 #include "drift/filter/inekf/correction/position_correction.h"
+#include "drift/filter/inekf/correction/pose_correction.h"
 // #include "drift/filter/inekf/correction/velocity_correction.h"
 #include "drift/filter/inekf/propagation/imu_propagation.h"
 #include "drift/imu_filter/imu_ang_vel_ekf.h"
@@ -211,6 +212,30 @@ class InekfEstimator {
                                const std::string& yaml_filepath
                                = "config/filter/inekf/"
                                  "correction/position_correction.yaml");
+
+  void add_pose_correction(OdomQueuePtr buffer_ptr,
+                                std::shared_ptr<std::mutex> buffer_mutex_ptr,
+                                const std::string& yaml_filepath
+                                = "config/filter/inekf/"
+                                    "correction/pose_correction.yaml");
+
+  // ======================================================================
+  /**
+   * @brief Add a orientation correction method to the InekfEstimator object, which
+   * uses orientation data to correct the state of the robot. This correction
+   * method will be called in the when the filter is running.
+   *
+   * @param[in] buffer_ptr: The position buffer queue temporarily stores the
+   * message from the subscriber.
+   * @param[in] buffer_mutex_ptr: The imu buffer mutex pointer
+   * @param[in] yaml_filepath: The yaml file path for the orientation correction
+   * config
+   */
+//    void add_orientation_correction(IMUQueuePtr buffer_ptr,
+//     std::shared_ptr<std::mutex> buffer_mutex_ptr,
+//     const std::string& yaml_filepath
+//     = "config/filter/inekf/"
+//       "correction/orientation_correction.yaml");
 
   /// @name Utility functions
   /// @{

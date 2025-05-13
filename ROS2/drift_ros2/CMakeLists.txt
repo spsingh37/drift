@@ -59,6 +59,7 @@ add_library(drift SHARED
   ${PROJECT_SOURCE_DIR}/../../src/filter/base_propagation.cpp
   ${PROJECT_SOURCE_DIR}/../../src/filter/base_correction.cpp
   ${PROJECT_SOURCE_DIR}/../../src/filter/inekf/correction/position_correction.cpp
+  ${PROJECT_SOURCE_DIR}/../../src/filter/inekf/correction/pose_correction.cpp
   ${PROJECT_SOURCE_DIR}/../../src/filter/inekf/propagation/imu_propagation.cpp
   ${PROJECT_SOURCE_DIR}/../../src/filter/inekf/inekf.cpp
   ${PROJECT_SOURCE_DIR}/../../src/imu_filter/imu_ang_vel_ekf.cpp
@@ -78,7 +79,7 @@ target_link_libraries(ros_communication_lib drift)
 ament_target_dependencies(ros_communication_lib rclcpp std_msgs nav_msgs sensor_msgs geometry_msgs message_filters custom_sensor_msgs)
 
 # Add executable targets
-set(EXECUTABLES wamv_gtodom_ros2 wamv_gps_ros2)
+set(EXECUTABLES wamv_gtodom_ros2 wamv_gps_ros2 wamv_gpsimu_ros2)
 
 foreach(exec ${EXECUTABLES})
   add_executable(${exec} ${PROJECT_SOURCE_DIR}/examples/${exec}.cpp)

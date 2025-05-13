@@ -64,6 +64,10 @@
      auto qimu_and_mutex = ros_sub->AddIMUSubscriber(imu_topic);
      auto qimu = qimu_and_mutex.first;
      auto qimu_mutex = qimu_and_mutex.second;
+
+    //  auto q_newimu_and_mutex = ros_sub->AddIMUSubscriber(imu_topic);
+    //  auto q_newimu = q_newimu_and_mutex.first;
+    //  auto q_newimu_mutex = q_newimu_and_mutex.second;
  
      // Wait until the first IMU message arrives
      std::vector<double> rotation_gpssrc2body;
@@ -97,6 +101,7 @@
  
      inekf_estimator.add_imu_propagation(qimu, qimu_mutex, project_dir + "/config/wamv_gps_ros2/imu_propagation.yaml");
      inekf_estimator.add_position_correction(qp, qp_mutex, project_dir + "/config/wamv_gps_ros2/position_correction.yaml");
+    //  inekf_estimator.add_orientation_correction(q_newimu, q_newimu_mutex, project_dir + "/config/wamv_gps_ros2/orientation_correction.yaml");
  
      auto robot_state_queue_ptr = inekf_estimator.get_robot_state_queue_ptr();
      auto robot_state_queue_mutex_ptr = inekf_estimator.get_robot_state_queue_mutex_ptr();

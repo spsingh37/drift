@@ -200,6 +200,134 @@ PositionQueuePair ROSSubscriber::AddGPS2PositionSubscriber(
     return {position_queue_ptr, mutex};
 }
 
+PoseQueuePair ROSSubscriber::AddGPSIMU2PoseSubscriber(
+    const std::string &gps_topic_name,
+    const std::string &imu_topic_name,
+    const std::vector<double> &translation_gpssrc2body,
+    const std::vector<double> &rotation_gpssrc2body)
+{
+    std::cout << "Subscribing to GPS: " << gps_topic_name << " and IMU: " << imu_topic_name << std::endl;
+
+    auto pose_queue_ptr = std::make_shared<OdomQueue>();
+    auto mutex = std::make_shared<std::mutex>();
+
+    // Transform from GPS source to robot body
+    Eigen::Quaterniond orientation_quat(
+        rotation_gpssrc2body[0], rotation_gpssrc2body[1],
+        rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+
+    gps_src_to_body_ = Eigen::Matrix4d::Identity();
+    gps_src_to_body_.block<3,3>(0,0) = orientation_quat.toRotationMatrix();
+    gps_src_to_body_.block<3,1>(0,3) = Eigen::Vector3d(translation_gpssrc2body.data());
+
+    // IMU orientation state (latest orientation from IMU)
+    std::shared_ptr<geometry_msgs::msg::Quaternion> latest_orientation =
+        std::make_shared<geometry_msgs::msg::Quaternion>();
+
+    // IMU subscriber (800 Hz)
+    // auto imu_callback = [this, latest_orientation](const sensor_msgs::msg::Imu::SharedPtr msg) {
+    //     *latest_orientation = msg->orientation;
+    // };
+    auto imu_callback = [this, latest_orientation](const sensor_msgs::msg::Imu::SharedPtr msg) {
+        *latest_orientation = msg->orientation;
+    
+        // Convert ROS quaternion to Eigen
+        Eigen::Quaterniond current_q(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+    
+        // if (!initial_orientation_set) {
+        //     *initial_orientation = current_q;
+        //     initial_orientation_set = true;
+        // }
+        if (!this->initial_orientation_set) {
+            *(this->initial_orientation) = current_q;
+            this->initial_orientation_set = true;
+        }        
+    };    
+
+    subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::Imu>(
+        imu_topic_name, 1000, imu_callback));
+
+    // GPS reference initialization
+    rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr temp_sub;
+    temp_sub = node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+        gps_topic_name, 10,
+        [&, this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+            if (!reference_initialized) {
+                reference_position << msg->latitude, msg->longitude, msg->altitude;
+                reference_initialized = true;
+                RCLCPP_INFO(node_->get_logger(), "GPS reference initialized: [%f, %f, %f]",
+                            reference_position(0), reference_position(1), reference_position(2));
+                temp_sub.reset();
+            }
+        });
+
+    // Main GPS subscriber: on message, combine with latest IMU orientation
+    // auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+    //     if (!reference_initialized) {
+    //         RCLCPP_WARN(node_->get_logger(), "Reference GPS not initialized. Skipping.");
+    //         return;
+    //     }
+
+    //     // Convert GPS to position (e.g., using ENU or NED based on reference_position)
+    //     measurement::Odom odom = GPS2PositionCallback(
+    //         msg, *latest_orientation, gps_src_to_body_, reference_position);
+
+    //     // Push into queue
+    //     {
+    //         std::lock_guard<std::mutex> lock(*mutex);
+    //         pose_queue_ptr->push_back(odom);
+    //     }
+    // };
+    // auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+    //     if (!reference_initialized) {
+    //         reference_position << msg->latitude, msg->longitude, msg->altitude;
+    //         reference_initialized = true;
+    //         RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
+    //                     reference_position(0), reference_position(1), reference_position(2));
+    //     }
+    
+    //     // RCLCPP_INFO(node_->get_logger(), "Processing GPS message: [%f, %f, %f]", msg->latitude, msg->longitude, msg->altitude);
+        
+    //     // Check if the reference position is initialized
+    //     if (reference_initialized) {
+    //         const geometry_msgs::msg::Quaternion& ros_q = *latest_orientation;
+    //         Eigen::Quaterniond eigen_q(ros_q.w, ros_q.x, ros_q.y, ros_q.z);
+    //         // GPSIMU2PoseCallback(msg, mutex, *latest_orientation, pose_queue_ptr, reference_position);
+    //         GPSIMU2PoseCallback(msg, mutex, eigen_q, pose_queue_ptr, reference_position);
+    //     } else {
+    //         RCLCPP_WARN(node_->get_logger(), "Reference position still not initialized! Skipping message.");
+    //     }
+    // };
+    auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+        if (!reference_initialized) {
+            reference_position << msg->latitude, msg->longitude, msg->altitude;
+            reference_initialized = true;
+            RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
+                        reference_position(0), reference_position(1), reference_position(2));
+        }
+    
+        if (reference_initialized && this->initial_orientation_set) {
+            const geometry_msgs::msg::Quaternion& ros_q = *latest_orientation;
+            Eigen::Quaterniond current_q(ros_q.w, ros_q.x, ros_q.y, ros_q.z);
+    
+            // Compute relative orientation
+            Eigen::Quaterniond relative_q = this->initial_orientation->inverse() * current_q;
+    
+            GPSIMU2PoseCallback(msg, mutex, relative_q, pose_queue_ptr, reference_position);
+        } else {
+            RCLCPP_WARN(node_->get_logger(), "Reference or initial orientation not initialized! Skipping message.");
+        }
+    };
+    
+
+    subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+        gps_topic_name, 1000, gps_callback));
+
+    pose_queue_list_.push_back(pose_queue_ptr);
+    return {pose_queue_ptr, mutex};
+}
+
+
 
 
 // void ROSSubscriber::StartSubscribingThread() {
@@ -441,6 +569,56 @@ void ROSSubscriber::GPS2PositionCallback(
     }
 }
 
+void ROSSubscriber::GPSIMU2PoseCallback(
+    const sensor_msgs::msg::NavSatFix::SharedPtr gps_msg,
+    std::shared_ptr<std::mutex> pose_mutex,
+    const Eigen::Quaterniond& imu_orientation,
+    OdomQueuePtr pose_queue,
+    Eigen::Vector3d& reference_position)
+{
+    if (!reference_initialized) {
+        RCLCPP_WARN(node_->get_logger(), "Reference position not initialized yet! Ignoring GPS message.");
+        return;
+    }
+
+    auto pose_measurement = std::make_shared<OdomMeasurement>();
+
+    // Extract reference position
+    double lat0 = reference_position(0);
+    double lon0 = reference_position(1);
+    double alt0 = reference_position(2);
+
+    // Convert GPS to ENU
+    measurement::NavSatMeasurement<double> navsat_measurement;
+    navsat_measurement.set_navsatfix(gps_msg->latitude, gps_msg->longitude, gps_msg->altitude);
+    Eigen::Vector3d enu_translation = navsat_measurement.get_enu(lat0, lon0, alt0);
+
+    // Build ENU transformation (position only)
+    Eigen::Matrix4d enu_transformation = Eigen::Matrix4d::Identity();
+    enu_transformation.block<3, 1>(0, 3) = enu_translation;
+
+    // Apply body correction: bring GPS source position into body frame
+    Eigen::Matrix4d transformed_pose = gps_src_to_body_.inverse() * enu_transformation;
+    Eigen::Vector3d transformed_translation = transformed_pose.block<3, 1>(0, 3);
+
+    // Compose final pose (position + orientation)
+    pose_measurement->set_header(
+        gps_msg->header.stamp.sec,
+        gps_msg->header.stamp.sec + gps_msg->header.stamp.nanosec / 1e9,
+        gps_msg->header.frame_id);
+
+    pose_measurement->set_translation(transformed_translation);
+    // pose_measurement->set_orientation(imu_orientation);
+    pose_measurement->set_rotation(imu_orientation);
+
+    pose_measurement->set_transformation();
+
+    // Add to queue with thread safety
+    {
+        std::lock_guard<std::mutex> lock(*pose_mutex);
+        pose_queue->push(pose_measurement);
+    }
+}
 
 
 

@@ -156,6 +156,14 @@ bool PositionCorrection::Correct(RobotState& state) {
                     * (measured_position->get_transformation().block<3, 1>(0, 3)
                        - state.get_position());
 
+  // std::cout << "Position correct...  Z/innovation: " << Z << std::endl;
+  // std::cout << "Position correct...  Z size: " << Z.size() << std::endl;
+  // std::cout << "Position correct...  H size: " << H.size() << std::endl;
+  // std::cout << "Position correct...  H: " << H << std::endl;
+  // std::cout << "Position correct...  N size: " << N.size() << std::endl;
+  // std::cout << "Position correct...  N: " << N << std::endl;
+  // std::cout << "Position correct...  covariance size: " << dimP << std::endl;
+
   // Correct state using Left Invariant EKF
   if (Z.rows() > 0) {
     CorrectLeftInvariant(Z, H, N, state, error_type_);
