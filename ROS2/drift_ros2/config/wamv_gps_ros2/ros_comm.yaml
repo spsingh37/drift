@@ -19,11 +19,11 @@ subscribers:
 
 publishers:
   # Define publish rate and topics for publishers
-  pose_publish_rate: 1000 # Hz
+  pose_publish_rate: 500 #1000 # Hz
   pose_publish_topic: "/wamv/inekf_odom_correction/pose"
   pose_frame: "/map"
 
-  path_publish_rate: 100 # Hz
+  path_publish_rate: 50 #100 # Hz
   path_publish_topic: "/wamv/inekf_odom_correction/path"
 
   twist_publish_topic: "/wamv/inekf_odom_correction/twist"

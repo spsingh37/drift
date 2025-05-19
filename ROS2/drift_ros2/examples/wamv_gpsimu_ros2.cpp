@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 
     // Start estimator thread
     std::thread estimator_thread([&]() {
-        rclcpp::Rate rate(5000);
+        rclcpp::Rate rate(5000); // 5000 Hz
         while (rclcpp::ok()) {
             if (inekf_estimator.is_enabled()) {
                 inekf_estimator.RunOnce();

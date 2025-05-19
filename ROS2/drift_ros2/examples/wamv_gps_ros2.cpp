@@ -65,9 +65,7 @@
      auto qimu = qimu_and_mutex.first;
      auto qimu_mutex = qimu_and_mutex.second;
 
-    //  auto q_newimu_and_mutex = ros_sub->AddIMUSubscriber(imu_topic);
-    //  auto q_newimu = q_newimu_and_mutex.first;
-    //  auto q_newimu_mutex = q_newimu_and_mutex.second;
+    
  
      // Wait until the first IMU message arrives
      std::vector<double> rotation_gpssrc2body;
@@ -89,6 +87,7 @@
              rate.sleep();
          }
      }
+    //  auto rotation_gpssrc2body = config["subscribers"]["rotation_gps_source_to_body"].as<std::vector<double>>();
  
      auto qp_and_mutex = ros_sub->AddGPS2PositionSubscriber(
          gps_topic, translation_gpssrc2body, rotation_gpssrc2body);
@@ -115,7 +114,7 @@
  
      // Start estimator thread
      std::thread estimator_thread([&]() {
-         rclcpp::Rate rate(5000); // 20 Hz
+         rclcpp::Rate rate(5000); // 5000 Hz
          while (rclcpp::ok()) {
              if (inekf_estimator.is_enabled()) {
                  inekf_estimator.RunOnce();

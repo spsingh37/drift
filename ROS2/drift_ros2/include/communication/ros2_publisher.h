@@ -10,7 +10,8 @@
 
 #include <nav_msgs/msg/path.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+// #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
@@ -53,7 +54,8 @@ class ROSPublisher {
 
   bool thread_started_;            // Flag for thread started
 
-  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
+  // rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
   // rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
@@ -75,7 +77,7 @@ class ROSPublisher {
   std::array<float, 3> first_pose_;
   std::vector<geometry_msgs::msg::PoseStamped> poses_;
   std::mutex poses_mutex_;
-
+  size_t max_path_length_ = 1000;
   bool enable_slip_publisher_;
 
   std::shared_ptr<RobotState> prev_state_;

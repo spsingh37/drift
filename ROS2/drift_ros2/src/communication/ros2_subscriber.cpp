@@ -224,20 +224,12 @@ PoseQueuePair ROSSubscriber::AddGPSIMU2PoseSubscriber(
     std::shared_ptr<geometry_msgs::msg::Quaternion> latest_orientation =
         std::make_shared<geometry_msgs::msg::Quaternion>();
 
-    // IMU subscriber (800 Hz)
-    // auto imu_callback = [this, latest_orientation](const sensor_msgs::msg::Imu::SharedPtr msg) {
-    //     *latest_orientation = msg->orientation;
-    // };
     auto imu_callback = [this, latest_orientation](const sensor_msgs::msg::Imu::SharedPtr msg) {
         *latest_orientation = msg->orientation;
     
         // Convert ROS quaternion to Eigen
         Eigen::Quaterniond current_q(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
     
-        // if (!initial_orientation_set) {
-        //     *initial_orientation = current_q;
-        //     initial_orientation_set = true;
-        // }
         if (!this->initial_orientation_set) {
             *(this->initial_orientation) = current_q;
             this->initial_orientation_set = true;
@@ -261,43 +253,6 @@ PoseQueuePair ROSSubscriber::AddGPSIMU2PoseSubscriber(
             }
         });
 
-    // Main GPS subscriber: on message, combine with latest IMU orientation
-    // auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-    //     if (!reference_initialized) {
-    //         RCLCPP_WARN(node_->get_logger(), "Reference GPS not initialized. Skipping.");
-    //         return;
-    //     }
-
-    //     // Convert GPS to position (e.g., using ENU or NED based on reference_position)
-    //     measurement::Odom odom = GPS2PositionCallback(
-    //         msg, *latest_orientation, gps_src_to_body_, reference_position);
-
-    //     // Push into queue
-    //     {
-    //         std::lock_guard<std::mutex> lock(*mutex);
-    //         pose_queue_ptr->push_back(odom);
-    //     }
-    // };
-    // auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-    //     if (!reference_initialized) {
-    //         reference_position << msg->latitude, msg->longitude, msg->altitude;
-    //         reference_initialized = true;
-    //         RCLCPP_INFO(node_->get_logger(), "GPS reference position initialized: [%f, %f, %f]", 
-    //                     reference_position(0), reference_position(1), reference_position(2));
-    //     }
-    
-    //     // RCLCPP_INFO(node_->get_logger(), "Processing GPS message: [%f, %f, %f]", msg->latitude, msg->longitude, msg->altitude);
-        
-    //     // Check if the reference position is initialized
-    //     if (reference_initialized) {
-    //         const geometry_msgs::msg::Quaternion& ros_q = *latest_orientation;
-    //         Eigen::Quaterniond eigen_q(ros_q.w, ros_q.x, ros_q.y, ros_q.z);
-    //         // GPSIMU2PoseCallback(msg, mutex, *latest_orientation, pose_queue_ptr, reference_position);
-    //         GPSIMU2PoseCallback(msg, mutex, eigen_q, pose_queue_ptr, reference_position);
-    //     } else {
-    //         RCLCPP_WARN(node_->get_logger(), "Reference position still not initialized! Skipping message.");
-    //     }
-    // };
     auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
         if (!reference_initialized) {
             reference_position << msg->latitude, msg->longitude, msg->altitude;
@@ -326,6 +281,94 @@ PoseQueuePair ROSSubscriber::AddGPSIMU2PoseSubscriber(
     pose_queue_list_.push_back(pose_queue_ptr);
     return {pose_queue_ptr, mutex};
 }
+
+// PoseQueuePair ROSSubscriber::AddGPSIMU2PoseSubscriber(
+//     const std::string &gps_topic_name,
+//     const std::string &imu_topic_name,
+//     const std::vector<double> &translation_gpssrc2body,
+//     const std::vector<double> &rotation_gpssrc2body)
+// {
+//     std::cout << "Subscribing to GPS: " << gps_topic_name << " and IMU: " << imu_topic_name << std::endl;
+
+//     auto pose_queue_ptr = std::make_shared<OdomQueue>();
+//     auto mutex = std::make_shared<std::mutex>();
+
+//     // Transform from GPS source to robot body
+//     Eigen::Quaterniond orientation_quat(
+//         rotation_gpssrc2body[0], rotation_gpssrc2body[1],
+//         rotation_gpssrc2body[2], rotation_gpssrc2body[3]);
+
+//     gps_src_to_body_ = Eigen::Matrix4d::Identity();
+//     gps_src_to_body_.block<3,3>(0,0) = orientation_quat.toRotationMatrix();
+//     gps_src_to_body_.block<3,1>(0,3) = Eigen::Vector3d(translation_gpssrc2body.data());
+
+//     // === Replace dynamic IMU tracking with fixed orientation ===
+//     // Set latest_orientation to identity (or static known value)
+//     auto latest_orientation = std::make_shared<geometry_msgs::msg::Quaternion>();
+//     latest_orientation->w = 1.0;  // Identity quaternion
+//     latest_orientation->x = 0.0;
+//     latest_orientation->y = 0.0;
+//     latest_orientation->z = 0.0;
+
+//     // Comment out the IMU subscriber for now (testing if it affects publishing rate)
+//     /*
+//     auto imu_callback = [this, latest_orientation](const sensor_msgs::msg::Imu::SharedPtr msg) {
+//         *latest_orientation = msg->orientation;
+
+//         Eigen::Quaterniond current_q(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+
+//         if (!this->initial_orientation_set) {
+//             *(this->initial_orientation) = current_q;
+//             this->initial_orientation_set = true;
+//         }
+//     };
+
+//     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::Imu>(
+//         imu_topic_name, 1000, imu_callback));
+//     */
+
+//     // Reference GPS init
+//     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr temp_sub;
+//     temp_sub = node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+//         gps_topic_name, 10,
+//         [&, this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+//             if (!reference_initialized) {
+//                 reference_position << msg->latitude, msg->longitude, msg->altitude;
+//                 reference_initialized = true;
+//                 RCLCPP_INFO(node_->get_logger(), "GPS reference initialized: [%f, %f, %f]",
+//                             reference_position(0), reference_position(1), reference_position(2));
+//                 temp_sub.reset();
+//             }
+//         });
+
+//     auto gps_callback = [this, mutex, pose_queue_ptr, latest_orientation](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+//         if (!reference_initialized) {
+//             reference_position << msg->latitude, msg->longitude, msg->altitude;
+//             reference_initialized = true;
+//             RCLCPP_INFO(node_->get_logger(), "GPS reference initialized: [%f, %f, %f]",
+//                         reference_position(0), reference_position(1), reference_position(2));
+//         }
+
+//         if (reference_initialized /* && this->initial_orientation_set */) {
+//             const geometry_msgs::msg::Quaternion& ros_q = *latest_orientation;
+//             Eigen::Quaterniond current_q(ros_q.w, ros_q.x, ros_q.y, ros_q.z);
+
+//             // If you want to simulate relative rotation: use identity
+//             Eigen::Quaterniond relative_q = current_q; // No delta from initial orientation
+
+//             GPSIMU2PoseCallback(msg, mutex, relative_q, pose_queue_ptr, reference_position);
+//         } else {
+//             RCLCPP_WARN(node_->get_logger(), "Reference not initialized! Skipping GPS message.");
+//         }
+//     };
+
+//     subscriber_list_.push_back(node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+//         gps_topic_name, 1000, gps_callback));
+
+//     pose_queue_list_.push_back(pose_queue_ptr);
+//     return {pose_queue_ptr, mutex};
+// }
+
 
 
 
